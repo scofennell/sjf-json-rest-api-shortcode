@@ -2,6 +2,12 @@
 
 /**
  * Plugin Name: SJF Test JSON Rest API
+ * Plugin URI: http://scottfennell.org/2014/09/08/wordpress-json-rest-api-shortcode-tutorial/
+ * Description: The purpose of this plugin is to give developers a simple block of code for "hello-world-ing" the new WordPress JSON Rest API:  http://wp-api.org/.
+ * Version: 1.0
+ * Author: scofennell@gmail.com
+ * Author URI: http://scottfennell.org
+ * License: GPL2
  */
 
 /**
@@ -11,8 +17,9 @@
  *	* [sjf_tjra_form]
  *	* [sjf_tjra_form route=users data="{'email':'dude@dude.com','username':'newuser','name':'New User','password':'secret'}"]
  *	* [sjf_tjra_form route=posts method=get]
- * 
- * @return  string An HTML form with a script to send an ajax request to wp JSON API.
+ *
+ * @param  $atts An array of strings used as WordPress shortcode args.
+ * @return string An HTML form with a script to send an ajax request to wp JSON API.
  */
 function sjf_tjra_form( $atts ) {
 	
@@ -25,7 +32,12 @@ function sjf_tjra_form( $atts ) {
         // Also covered nicely in the docs: http://wp-api.org/#posts_create-a-post_input
         'data'	 => "{ title: 'Hello Worldly Title Here', content_raw: 'This is the content of the new post we are creating.' }",
         
-        // As per docs:  "PUT": http://wp-api.org/#posts_edit-a-meta-for-a-post, "POST": http://wp-api.org/#users_create-a-user_response, "GET": http://wp-api.org/#posts_retrieve-posts.
+        /**
+         * As per docs:
+         * * "PUT": http://wp-api.org/#posts_edit-a-meta-for-a-post
+         * * "POST": http://wp-api.org/#users_create-a-user_response
+         * * "GET": http://wp-api.org/#posts_retrieve-posts
+         */
         'method' => 'POST',
 
     ), $atts );
@@ -75,6 +87,14 @@ function sjf_tjra_form( $atts ) {
 }
 add_shortcode( 'sjf_tjra_form', 'sjf_tjra_form' );
 
+/**
+ * Return JS to make an ajax call as instructed by the shortcode args.
+ * 
+ * @param  string $url    [description]
+ * @param  string $data   [description]
+ * @param  string $method The HTTP method, such as GET, POST, or PUT.
+ * @return string JS for making a jQuery ajax call to the WP JSON API.
+ */
 function sjf_tjra_script( $url, $data, $method ) {
 	$out = "
 		<script>
@@ -137,6 +157,8 @@ function sjf_tjra_script( $url, $data, $method ) {
 
 /**
  * Return some basic styles for the JSON response.
+ *
+ * @return string CSS for styling the HTML we get from the JSON API.
  */
 function sjf_tjra_style() {
 	$out = "
