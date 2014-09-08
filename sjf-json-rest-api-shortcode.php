@@ -18,6 +18,7 @@
  *	* [sjf_tjra_form route=users data="{'email':'dude@dude.com','username':'newuser','name':'New User','password':'secret'}"]
  *	* [sjf_tjra_form route=posts method=get]
  *
+ * @see    http://wp-api.org/
  * @param  $atts An array of strings used as WordPress shortcode args.
  * @return string An HTML form with a script to send an ajax request to wp JSON API.
  */
