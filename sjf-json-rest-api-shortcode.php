@@ -16,12 +16,27 @@
  */
 function sjf_tjra_form( $atts ) {
 	
+	// The default args have the affecting of sending a 'POST' request to the 'posts' route, to create a new sample draft post.
     $a = shortcode_atts( array(
+
+    	// Explained quite well in the docs: http://wp-api.org/guides/getting-started.html#routes-vs-endpoints
         'route'  => 'posts',
+        
+        // Also covered nicely in the docs: http://wp-api.org/#posts_create-a-post_input
         'data'	 => "{ title: 'Hello Worldly Title Here', content_raw: 'This is the content of the new post we are creating.' }",
+        
+        // As per docs:  "PUT": http://wp-api.org/#posts_edit-a-meta-for-a-post, "POST": http://wp-api.org/#users_create-a-user_response, "GET": http://wp-api.org/#posts_retrieve-posts.
         'method' => 'POST',
+
     ), $atts );
 
+    // Make sure the json api is available.
+    if( ! function_exists( 'json_api_init' ) ) {
+    	wp_die( __( 'You do not have the JSON API available.  Try activating this plugin: https://wordpress.org/plugins/json-rest-api/' ) );
+    }
+
+    // We are gonna need jQuery.    
+	wp_enqueue_script( 'jquery');
 
 	// Build a url to which we'll send our data.
 	$base = trailingslashit( get_bloginfo( 'url' ) ).'wp-json/';
@@ -38,13 +53,19 @@ function sjf_tjra_form( $atts ) {
 	// When we get a response from the JSON API, we'll give it some basic styles.
 	$style = sjf_tjra_style();
 	
-	// To be clear, the form really doesn't do anything.  It's just a UI to trigger the Ajax call.
-	$out = "
+	// This div will hold the response we get back after we ping the API.
+	$output_div = "<div id='output'></div>";
+
+	// To be clear, the form really doesn't do anything other than get clicked.  It's just a UI to trigger the Ajax call.
+	$form = "
 		<form action='$url' method='$method' id='sjf_tjra_form'>
 			<input type='submit' value='Submit' name='submit'>
 		</form>
-		<div id='output'>
-		</div>
+	";
+
+	$out = "
+		$form
+		$output_div
 		$script
 		$style
 	";
