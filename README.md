@@ -7,6 +7,6 @@ As of WordPress 4.0, the JSON API is not part of core, so this plugin dies if th
 
 Example shortcode uses:
 
- * Create a sample draft post: [sjf_tjra_form]
- * Create a new user: [sjf_tjra_form route=users data="{'email':'dude@dude.com','username':'newuser','name':'New User','password':'secret'}"]
- * Browse posts: [sjf_tjra_form route=posts method=get]
+ * View JSON data for current blog: [json]
+ * Create a new user: [json method='post' route='users' data="{'email':'dude@dude.com','username':'newuser','name':'New User','password':'secret'}"]
+ * Browse posts: [json route=posts]

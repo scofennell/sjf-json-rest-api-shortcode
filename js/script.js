@@ -24,10 +24,16 @@
 		$( '#sjf_tjra_form [type="submit"]' ).replaceWith( 'loading...' );
         
         // Grab the shortcode args from the DOM.
-        domain = $( '#values #domain' ).text();
-        method = $( '#values #method' ).text();
-        route  = $( '#values #route' ).text();
-        data   = $( '#values #data' ).text();
+        // domain = $( '#values #domain' ).text();
+        // method = $( '#values #method' ).text();
+        // route  = $( '#values #route' ).text();
+        // data   = $( '#values #data' ).text();
+        
+        domain = sjf_tjra.domain;
+        method = sjf_tjra.method;
+        route  = sjf_tjra.route;
+        data   = sjf_tjra.data;
+        nonce   = sjf_tjra.nonce;
         
 		// Send the data to the server.
         var ajaxData = {
@@ -37,20 +43,22 @@
             
             // Our shortcode args.
         	domain: domain,
-			route: route,
+			route:  route,
 			method: method,
-			data: data,
+			data:   data,
+			nonce:  nonce
 
         };
 
 		// Make the ajax call.
-        $.get( sjf_tjra.ajaxurl, ajaxData, function( ajaxData ) {
-            
-            // Print the result of the Ajax call in the output div.
-            $( '#output' ).html( ajaxData ).fadeIn();
+        $.get( sjf_tjra.ajaxurl, ajaxData, function( ajaxResult ) {
 
 			// Fade out the form.
             $( '#sjf_tjra_form' ).fadeOut();
+            
+            // Print the result of the Ajax call in the output div.
+            $( '#output' ).html( ajaxResult ).fadeIn();
+
 
         });
         
