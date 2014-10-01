@@ -71,15 +71,21 @@ class SJF_Test_JSON_REST_API {
 	
 			/**
 			 * As per docs:
-			 * * "PUT": http://wp-api.org/#posts_edit-a-meta-for-a-post
+			 * * "PUT":  http://wp-api.org/#posts_edit-a-meta-for-a-post
 			 * * "POST": http://wp-api.org/#users_create-a-user_response
-			 * * "GET": http://wp-api.org/#posts_retrieve-posts
+			 * * "GET":  http://wp-api.org/#posts_retrieve-posts
 			 */
 			'method' => 'GET',
 
 			// Also covered nicely in the docs: http://wp-api.org/#posts_create-a-post_input
 			// 'data'	 => "{ title: 'Hello Worldly Title Here', content_raw: 'This is the content of the new post we are creating.' }",
 			'data'	 => '{}',
+
+			/**
+			 * Make a nonce as per docs.
+			 * @see http://wp-api.org/guides/authentication.html#cookie-authentication
+			 */
+			'nonce'  => wp_create_nonce( 'wp_json' ),
 
 		), $atts );
 
@@ -90,114 +96,126 @@ class SJF_Test_JSON_REST_API {
 		$this -> scripts();
 
 		// Sanitize the shortcode args before sending them to our ajax script.
-		$domain = trailingslashit( esc_url( $a[ 'domain' ] ) );
-		$route  = urlencode( $a[ 'route' ] );
-		$method = strtoupper( esc_attr( $a[ 'method' ] ) );
-		$data   = sanitize_text_field( $a[ 'data' ] );
-
-		// Build a url to which we'll send our data.
-		$url = $this -> build_url( $domain, $route );
-
-		// Get current page protocol
-		$protocol = isset( $_SERVER[ 'HTTPS'] ) ? 'https://' : 'http://';
-
-		// Set up a variable to maybe hold a nonce.
-		$nonce = __( '(Not needed for GET requests.)' );
-		$nonce_header = 'null';
-
-		// If it's not a get request, we need to do some stuff.
-		if( $method != 'GET' ) {
-
-			/*
-			$data = array(
-				'title' => 			'this is the title',
-				'content_raw' => 	'this is the content',
-			);
-
-			$data = json_encode( $data );
-			*/
-
-			// If you're making anything other than a GET request, you need to supply data.
-			if( empty( $data ) || ( $data == '{}' ) ) { wp_die( __( "You must supply data when making a $method request. Example: { title: 'Hello Worldly Title Here', content_raw: 'This is the content of the new post we are creating.' } " ) ); }
-
-			
-			/**
-			 * Make a nonce as per docs.
-			 * @see http://wp-api.org/guides/authentication.html#cookie-authentication
-			 */
-			$nonce = wp_create_nonce( 'wp_json' );
-			$nonce_header = '{"X-WP-Nonce" : "'.$nonce.'"}';
-
-		}
+		$a = array_map( 'esc_attr', $a );
 
 		/**
-		 * Add the shortcode args to the DOM so we can grab them with jQuery.  Also nice for debugging/clarity.
-		 * @todo It would probably be more useful, and be more readable, if these were text inputs in a form.
+		 * Make a nonce as per docs.
+		 * @see http://wp-api.org/guides/authentication.html#cookie-authentication
 		 */
-		$values = "
-			<h3>" . __( "Shortcode args:" ) . "</h3>
-			<ul id='values'>
-				<li><strong>Domain:</strong> $domain</li>
-				<li><strong>Method:</strong> $method</li>
-				<li><strong>Route:</strong> $route</li>
-				<li><strong>Data:</strong> $data</li>
-				<li><strong>Nonce:</strong> $nonce</li>
-			</ul>
-		";
+		$nonce = wp_create_nonce( 'wp_json' );
 		
 		// When we get a response from the JSON API, we'll give it some basic styles.
 		$style = $this -> style();
 		
 		// This div will hold the response we get back after we ping the API.
-		$output = "<output id='output'></output>";
+		$output = "<output id='sjf-tjra-output'></output>";
 
 		// To be clear, the form really doesn't do anything other than get clicked.  It's just a UI to trigger the Ajax call.
 		$submit = __( 'Submit' );
+
+		$field_array = array(
+			'domain' => __( 'Domain:' ),
+			'method' => __( 'Method:' ),
+			'route'  => __( 'Route:' ),
+			'data'   => __( 'Data:' ),
+			'nonce'  => __( 'Nonce:' ),
+		);
+		$fields = '';
+		foreach( $field_array as $k => $v ) {
+			$fields .= "<label class='sjf-tjra-form-label' for='$k'>$v</label> <input id='$k' class='sjf-tjra-form-input' name='$k' value='$a[$k]'>";
+		}
 		$form = "
-			<form action='#' method='$method' id='sjf_tjra_form'>
-				<button name='submit'>$submit</button>
+			<form action='#' method='$method' id='sjf-tjra-form'>
+				$fields
+				<button class='sjf-tjra-form-button' name='submit'>$submit</button>
 			</form>
 		";
 
 		/**
-		 * @todo Do more intelligent output by reporting each part of the http response, a al console.log( jqxhr );
+		 * @todo Do more intelligent output by reporting each part of the http response, a la console.log( jqxhr );
 		 */
 		$inline_script = "
 
 			<script>
 
+				function escapeHtmlEntities (str) {
+				if (typeof jQuery !== 'undefined') {
+				// Create an empty div to use as a container,
+				// then put the raw text in and get the HTML
+				// equivalent out.
+				return jQuery('<div/>').text(str).html();
+				}
+
+				// No jQuery, so use string replace.
+				return str
+				.replace(/&/g, '&amp;')
+				.replace(/>/g, '&gt;')
+				.replace(/</g, '&lt;')
+				.replace(/\"/g, '&quot;');
+				}
+
 				( function( $ ) {
 
 				    // Set us up for a sick show/hide when we get a response from the API.
-					$( '#output' ).hide();
+					$( '#sjf-tjra-output' ).hide();
 
 					// When the form is submit...
-					$( '#sjf_tjra_form' ).on( 'submit', function( event ) {
+					$( '#sjf-tjra-form' ).on( 'submit', function( event ) {
 			
 						// Don't actually submit the form or reload the page.
 						event.preventDefault();
 	    
 	    				// Replace it with loading text.
-						$( '#sjf_tjra_form button' ).replaceWith( 'loading...' );
+						$( '.sjf-tjra-form-button' ).replaceWith( 'loading...' );
 	        
 						// Fade out the form.
-        			    $( '#sjf_tjra_form' ).fadeOut();
+        			    $( this ).fadeOut();
             
+            			// Get the domain, sans trailing slash.
+        			    domain = $( '#domain' ).val();
+        			    domain = domain.replace(/\/$/, '');
+
+        			    method = $( '#method' ).val();
+
+        			    // Get the route, sans trailing slash.
+        			    route = $( '#route' ).val();
+        			    route = route.replace(/\/$/, '');
+
+        			    data = $( '#data' ).val();
+
+        			    nonce = $( '#nonce' ).val();
+
+        			    var url = domain + '/wp-json/' + route;	
+
 						var jqxhr = jQuery.ajax({
-							url:	 '$url',
-							type: 	 '$method',
-							data: 	 '$data',
-							headers: $nonce_header
+							url:	 url,
+							type: 	 method,
+							data: 	 data,
+							headers: {
+								'X-WP-Nonce': nonce
+							}
 						})
 						.done(function() {
 							console.log( 'done' );
+							console.log( jqxhr );
 						})
 						.fail(function() {
 							console.log( 'fail' );
 						})
 						.always(function() {
 							console.log( 'always' );
-							$( '#output' ).html( jqxhr.responseText ).fadeIn().css( 'display', 'block' );
+							
+							responseText = jqxhr.responseText;
+							readyState = jqxhr.readyState;
+							status = jqxhr.status;
+							statusText = jqxhr.statusText;
+							
+							var output ='<h3>readyState</h3> <p>' + readyState + '</p>';
+							output += '<h3>status</h3> <p>' + status + '</p>';
+							output += '<h3>statusText</h3> <p>' + statusText + '</p>';	
+							output += '<h3>responseText</h3> <p>' + escapeHtmlEntities( responseText ) + '</p>';
+							
+							$( '#sjf-tjra-output' ).html( output ).fadeIn().css( 'display', 'block' );
 						});
 
 	     			});
@@ -231,7 +249,8 @@ class SJF_Test_JSON_REST_API {
 	function style() {
 		$out = "
 			<style>
-				#output {
+				#sjf-tjra-form,
+				#sjf-tjra-output {
 					border: 1px solid #000;
 					border-radius: 1em;
 					font-family: courier, monospace;
@@ -240,13 +259,36 @@ class SJF_Test_JSON_REST_API {
 					margin: 2em;
 					padding: 2em;
 				}
-				#output >:first-child {
+				#sjf-tjra-output >:first-child {
 					margin-top: 0;
 					padding-top: 0;
 				}
-				#output >:last-child {
+				#sjf-tjra-output >:last-child {
 					margin-bottom: 0;
 					padding-bottom: 0;
+				}
+
+				.sjf-tjra-form-input,
+				.sjf-tjra-form-button {
+					display: block;
+				}
+				.sjf-tjra-form-input {
+					margin-bottom: 1em;
+					width: 100%;
+				}
+				.sjf-tjra-form-label {
+					font-style: italic;
+				}
+				.sjf-tjra-form-button {
+					border-radius: 3px;
+					box-shadow: 0px 0px 3px rgba(0,0,0,.25);
+				}
+				.sjf-tjra-form-button:active {
+					border-radius: 3px;
+					box-shadow: none;
+				}
+				#method {
+					text-transform: uppercase;
 				}
 			</style>
 		";
@@ -254,31 +296,6 @@ class SJF_Test_JSON_REST_API {
 		$out = apply_filters( 'sjf_tjra_style', $out );
 
 		return $out;
-	}
-
-	/**
-	 * Build a url to which we'll send our JSON request.
-	 * 
-	 * @param  string $domain The domain to which we'll submit our JSON request.
-	 * @param  string $route  The route at that domain to which we'll submit our JSON request.
-	 * @return string A url to which we'll send our JSON request
-	 */
-	function build_url( $domain, $route ) {
-		
-		// Sanitize the domain.
-		$domain  = trailingslashit( esc_url( $domain ) );
-		
-		// Append this item, which the WP JSON REST API plugin expects.
-		$domain .= 'wp-json/';
-
-		// Append the route.
-		$route   = urlencode( $route );
-		$out = $domain . $route;
-
-		$out = apply_filters( 'sjf_tjra_build_url', $out );
-
-		return $out;
-
 	}
 
 	/**

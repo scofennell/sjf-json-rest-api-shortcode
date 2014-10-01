@@ -78,3 +78,31 @@ function report_string( $string, $label ) {
 	
 	return $out;
 }
+
+
+
+
+	/**
+	 * Build a url to which we'll send our JSON request.
+	 * 
+	 * @param  string $domain The domain to which we'll submit our JSON request.
+	 * @param  string $route  The route at that domain to which we'll submit our JSON request.
+	 * @return string A url to which we'll send our JSON request
+	 */
+	function build_url( $domain, $route ) {
+		
+		// Sanitize the domain.
+		$domain  = trailingslashit( esc_url( $domain ) );
+		
+		// Append this item, which the WP JSON REST API plugin expects.
+		$domain .= 'wp-json/';
+
+		// Append the route.
+		$route   = urlencode( $route );
+		$out = $domain . $route;
+
+		$out = apply_filters( 'sjf_tjra_build_url', $out );
+
+		return $out;
+
+	}
