@@ -53,8 +53,8 @@ class SJF_Test_JSON_REST_API {
 	 *	* [json route=users data="{'email':'dude@dude.com','username':'newuser','name':'New User','password':'secret'}"]
 	 *	* [json route=posts method=get]
 	 *
-	 * @seehttp://wp-api.org/
-	 * @param  $atts An array of strings used as WordPress shortcode args.
+	 * @see    http://wp-api.org/
+	 * @param  array $atts An array of strings used as WordPress shortcode args.
 	 * @return string An HTML form with a script to send an ajax request to wp JSON API.
 	 */
 	function json( $atts ) {
@@ -92,27 +92,11 @@ class SJF_Test_JSON_REST_API {
 		// Make sure the json api is available.  If not, page will wp_die().
 		$this -> version_check();
 
-		// Enqueue jQuery.
-		$this -> scripts();
-
 		// Sanitize the shortcode args before sending them to our ajax script.
 		$a = array_map( 'esc_attr', $a );
-
-		/**
-		 * Make a nonce as per docs.
-		 * @see http://wp-api.org/guides/authentication.html#cookie-authentication
-		 */
-		$nonce = wp_create_nonce( 'wp_json' );
 		
-		// When we get a response from the JSON API, we'll give it some basic styles.
-		$style = $this -> style();
-		
-		// This div will hold the response we get back after we ping the API.
-		$output = "<output id='sjf-tjra-output'></output>";
-
-		// To be clear, the form really doesn't do anything other than get clicked.  It's just a UI to trigger the Ajax call.
-		$submit = __( 'Submit' );
-
+		// The fields in our form as key/value pairs.
+		// @todo I should be able to recycle the $a array, albeit with a str to label function.
 		$field_array = array(
 			'domain' => __( 'Domain:' ),
 			'method' => __( 'Method:' ),
@@ -120,39 +104,56 @@ class SJF_Test_JSON_REST_API {
 			'data'   => __( 'Data:' ),
 			'nonce'  => __( 'Nonce:' ),
 		);
+
+		// For each field, output it as a label/input.
 		$fields = '';
 		foreach( $field_array as $k => $v ) {
 			$fields .= "<label class='sjf-tjra-form-label' for='$k'>$v</label> <input id='$k' class='sjf-tjra-form-input' name='$k' value='$a[$k]'>";
 		}
+		
+		// To be clear, the form really doesn't do anything other than get clicked.  It's just a UI to trigger the Ajax call.
+		$submit = __( 'Submit' );
 		$form = "
-			<form action='#' method='$method' id='sjf-tjra-form'>
+			<form action='#' id='sjf-tjra-form'>
 				$fields
 				<button class='sjf-tjra-form-button' name='submit'>$submit</button>
 			</form>
 		";
 
-		/**
-		 * @todo Do more intelligent output by reporting each part of the http response, a la console.log( jqxhr );
-		 */
-		$inline_script = "
+		// This div will hold the response we get back after we ping the API.
+		$output = '<output id="sjf-tjra-output"></output>';
 
+		// Enqueue jQuery.
+		$this -> scripts();
+
+		// Grab the JS to make our ajax call.
+		$inline_script = $this -> ajax();
+
+		// When we get a response from the JSON API, we'll give it some basic styles.
+		$style = $this -> style();
+
+		$out = "
+			$form
+			$output
+			$inline_script
+			$style
+		";
+
+		$out = apply_filters( 'sjf_tjra_json', $out );
+
+		return $out;
+
+	}
+
+	/**
+	 * Return the JS for making our ajax call.
+	 *
+	 * @return string The JS for making our ajax call.
+	 */
+	function ajax() {
+
+		$out = <<<EOT
 			<script>
-
-				function escapeHtmlEntities (str) {
-				if (typeof jQuery !== 'undefined') {
-				// Create an empty div to use as a container,
-				// then put the raw text in and get the HTML
-				// equivalent out.
-				return jQuery('<div/>').text(str).html();
-				}
-
-				// No jQuery, so use string replace.
-				return str
-				.replace(/&/g, '&amp;')
-				.replace(/>/g, '&gt;')
-				.replace(/</g, '&lt;')
-				.replace(/\"/g, '&quot;');
-				}
 
 				( function( $ ) {
 
@@ -166,55 +167,106 @@ class SJF_Test_JSON_REST_API {
 						event.preventDefault();
 	    
 	    				// Replace it with loading text.
-						$( '.sjf-tjra-form-button' ).replaceWith( 'loading...' );
+						// $( '.sjf-tjra-form-button' ).replaceWith( 'loading...' );
 	        
 						// Fade out the form.
-        			    $( this ).fadeOut();
+        			    // $( this ).fadeOut();
             
+            			// Grab the data, nonce, and method as-is.
+						data = $( '#data' ).val();
+        			    nonce = $( '#nonce' ).val();
+						method = $( '#method' ).val().toUpperCase();
+
             			// Get the domain, sans trailing slash.
         			    domain = $( '#domain' ).val();
-        			    domain = domain.replace(/\/$/, '');
-
-        			    method = $( '#method' ).val();
+        			    domain = domain.replace( /^\/|\/$/g, '' );
 
         			    // Get the route, sans trailing slash.
         			    route = $( '#route' ).val();
-        			    route = route.replace(/\/$/, '');
+        			    route = route.replace( /^\/|\/$/g, '' );
 
-        			    data = $( '#data' ).val();
+        			    // Concat the domain, the /wp-json/ and the route to form the url.
+        			    url = domain + '/wp-json/' + route;	
 
-        			    nonce = $( '#nonce' ).val();
+        			    // Set the dataType depending on if it is an external request.
+        			    dataType = 'json';
+        			    hostname = window.location.hostname;
+        			    if ( url.indexOf( hostname ) < 1 ) {
+        			    	if( method == 'GET' ) {
+	        			        dataType = 'jsonp';
+			        		   	url += '?_jsonp=?';	
+		        			}
+		        		}
 
-        			    var url = domain + '/wp-json/' + route;	
-
-						var jqxhr = jQuery.ajax({
-							url:	 url,
-							type: 	 method,
-							data: 	 data,
-							headers: {
-								'X-WP-Nonce': nonce
-							}
+        			    // Send our ajax request.
+						jqxhr = jQuery.ajax({
+							url:	  url,
+							type: 	  'POST',
+							data: 	  data,
+							dataType: dataType,
+							beforeSend : function( xhr ) {
+            					xhr.setRequestHeader( 'X-WP-Nonce', nonce );
+           					}
 						})
-						.done(function() {
+						.done( function() {
 							console.log( 'done' );
-							console.log( jqxhr );
 						})
-						.fail(function() {
+						.fail( function() {
 							console.log( 'fail' );
 						})
-						.always(function() {
+						.always( function() {
 							console.log( 'always' );
+							console.log( jqxhr );
 							
-							responseText = jqxhr.responseText;
+							// Grab the different parts of the response, escaping as needed.
+							responseText = jQuery( '<div/>' ).text( jqxhr.responseText ).html();
+							if( jqxhr.responseJSON ) {
+								responseJSON = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON ) ).html();
+								authentication = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON.authentication ) ).html();
+								oauth1 = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON.authentication.oauth1 ) ).html();
+								access = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON.authentication.oauth1.access ) ).html();
+								authorize = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON.authentication.oauth1.authorize ) ).html();
+								request = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON.authentication.oauth1.request ) ).html();
+								version  = jQuery( '<div/>' ).text( JSON.stringify( jqxhr.responseJSON.authentication.oauth1.version ) ).html();
+							}
 							readyState = jqxhr.readyState;
 							status = jqxhr.status;
 							statusText = jqxhr.statusText;
-							
-							var output ='<h3>readyState</h3> <p>' + readyState + '</p>';
-							output += '<h3>status</h3> <p>' + status + '</p>';
-							output += '<h3>statusText</h3> <p>' + statusText + '</p>';	
-							output += '<h3>responseText</h3> <p>' + escapeHtmlEntities( responseText ) + '</p>';
-							
+										
+							// And output them in the output element.
+							output =  '<h3>readyState</h3> <p>'   + readyState   + '</p>';
+							output += '<h3>status</h3> <p>' 	  + status 		 + '</p>';
+							output += '<h3>statusText</h3> <p>'   + statusText   + '</p>';
+							if ( responseText != '' ) {
+								output += '<h3>responseText</h3> <p>' + responseText + '</p>';
+							}
+
+							if( jqxhr.responseJSON ) {
+								
+								if ( responseJSON != '' ) {
+									output += '<h3>responseJSON</h3> <p>' + responseJSON + '</p>';
+								}
+								if ( authentication != '' ) {
+									output += '<h3>authentication</h3> <p>' + authentication + '</p>';
+								}
+								if ( oauth1 != '' ) {
+									output += '<h3>oauth1</h3> <p>' + oauth1 + '</p>';
+								}
+								if ( access != '' ) {
+									output += '<h3>access</h3> <p>' + access + '</p>';
+								}
+								if ( authorize != '' ) {
+									output += '<h3>authorize</h3> <p>' + authorize + '</p>';
+								}
+								if ( request != '' ) {
+									output += '<h3>request</h3> <p>' + request + '</p>';
+								}
+								if ( version != '' ) {
+									output += '<h3>version</h3> <p>' + version + '</p>';
+								}
+							}
+
+							// Fade the output element in and give it display block as opposed to it's default display inline.
 							$( '#sjf-tjra-output' ).html( output ).fadeIn().css( 'display', 'block' );
 						});
 
@@ -223,19 +275,9 @@ class SJF_Test_JSON_REST_API {
 				})( jQuery );
 
 			</script>
+EOT;
 
-		";
-
-		$out = "
-			$values
-			$form
-			$output
-			$script
-			$inline_script
-			$style
-		";
-
-		$out = apply_filters( 'sjf_tjra_json', $out );
+		$out = apply_filters( 'sjf_tjra_ajax', $out );
 
 		return $out;
 
